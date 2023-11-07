@@ -10,7 +10,7 @@ heuristic_service = heuristic_service.HeuristicService()
 ml_service = ml_service.MLService()
 
 
-@app.route("/heuristics", methods=['GET'])
+@app.route("/heuristics", methods=['GET', 'POST'])
 def get_keywords_heuristic():
     request_data = request.get_json()
     print('request: ', request_data)
@@ -21,7 +21,7 @@ def get_keywords_heuristic():
     return jsonify({'keywords': keywords_list})
 
 
-@app.route("/ml", methods=['GET'])
+@app.route("/ml", methods=['GET', 'POST'])
 def get_keywords_ml():
     json_ = request.json
     print('received request')

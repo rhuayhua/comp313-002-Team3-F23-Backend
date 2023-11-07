@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Web Scrapping Test Suite">
+    <parameter name="ExecutionType" value="Local"/>
+    <parameter name="PlatformName" value="Windows"/>
+    <parameter name="PlatformVersion" value="10"/>
+    <parameter name="BrowserName" value="Chrome"/>
+    <parameter name="BrowserVersion" value="109"/>
+    <parameter name="groups" value="Regression"/>
+
+    <listeners>
+        <listener class-name="Utility.Listener"/>
+    </listeners>
+
+    <test name="Scrapping">
+        <groups>
+            <define name="Regression">
+                <include name="Scrapping"></include>
+            </define>
+            <run>
+                <include name="Regression"></include>
+            </run>
+        </groups>
+        <classes>
+            <class name="TestSuites.Scrapping_Test"/>
+        </classes>
+    </test>
+
+
+</suite>

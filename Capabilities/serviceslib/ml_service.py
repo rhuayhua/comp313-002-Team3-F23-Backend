@@ -16,6 +16,25 @@ from gensim.models import KeyedVectors
 
 class MLService:
     def get_keywords(self, df):
+
+        # Set parameters
+        MAX_NUM_WORDS = 10000
+        MAX_SEQUENCE = 50
+        EMB_DIM = 300
+        THRESHOLD = 0.9
+
+        # Loading Tokenizer
+        with open("/app/Capabilities/tokenizer.pickle", "rb") as file:
+            tokenizer = pickle.load(file)
+
+        # Loading embedding matrix
+        with open("/app/Capabilities/embedding_matrix_w2v.pickle", "rb") as file:
+            embedding_matrix_w2v = pickle.load(file)
+
+        # Loading dummy  model
+        with open("/app/Capabilities/model_dummy.pkl", "rb") as file:
+            model = pickle.load(file)
+
         # Pre-process data
         df['jobDescription'] = df['jobDescription'].str.replace(
             r'\x96', ' ', regex=True)
@@ -28,26 +47,43 @@ class MLService:
         print('\nORIG noun phrases:{}'.format(list_noun_phrases))
         print('\nLOWERCASE noun phrases:{}'.format(lowercased_noun_phrases))
 
-        # # to be used
-        # with open("/app/Capabilities/tokenizer.pickle", "rb") as file:
-        #     tokenizer = pickle.load(file)
+        # Tokenize data
+        test_tok = tokenizer.texts_to_sequences(
+            np.asarray(lowercased_noun_phrases))
+        word_index = tokenizer.word_index
+        print('\nTOKENS: {}'.format(test_tok))
 
-        # # to be used
-        # test_t = tokenizer.texts_to_sequences(np.asarray(list_noun_phrases))
-        # test_t_padding = pad_sequences(test_t, 50)
-        # print(test_t_padding)
+        # Padding tokens
+        test_tok_padding = pad_sequences(test_tok, maxlen=MAX_SEQUENCE)
+        print('\nafter PADDING: {}'.format(test_tok_padding))
 
-        # load keras model
-        # model_cnn = load_model("/app/Capabilities/CNN_model.keras")
+        num_words_w2v = min(MAX_NUM_WORDS, len(word_index)) + 1
+        embedding_layer_w2v = Embedding(num_words_w2v, EMB_DIM,
+                                        embeddings_initializer=Constant(
+                                            embedding_matrix_w2v),
+                                        input_length=MAX_SEQUENCE, trainable=False)
 
-        # Opening dummy  model
-        with open("/app/Capabilities/model_dummy.pkl", "rb") as file:
-            model = pickle.load(file)
+        # LSTM network
+        lstm_w2v = Sequential()
+        lstm_w2v.add(embedding_layer_w2v)
+        lstm_w2v.add(SpatialDropout1D(0.2))  # Using an ideal value for RNN's
+        lstm_w2v.add(LSTM(256, dropout=0.2, recurrent_dropout=0.2))
+        lstm_w2v.add(Dense(128, activation='relu'))
+        lstm_w2v.add(Dense(64, activation='relu'))
+        lstm_w2v.add(Dense(32, activation='relu'))
+        lstm_w2v.add(Dense(1, activation='sigmoid'))
+        lstm_w2v.load_weights("/app/Capabilities/lstm_weights.h5")
+        lstm_predictions = lstm_w2v.predict(test_tok_padding)
+        index_lstm_pred = (lstm_predictions > THRESHOLD).flatten().tolist()
+
+        print('Prediction from LSTM: {}'.format(lstm_predictions))
+        print('boolean LSTM: {}'.format(index_lstm_pred))
 
         # get prediction from model
-        prediction = model.predict(lowercased_noun_phrases)
-        print("The result is", prediction)
-        return list_noun_phrases[prediction == 1].tolist()
+        # prediction = model.predict(lowercased_noun_phrases)
+        # print("Dummy result is: ", prediction)
+        # return list_noun_phrases[prediction == 1].tolist()
+        return list_noun_phrases[index_lstm_pred].tolist()
 
 
 def pre_process_text(text):

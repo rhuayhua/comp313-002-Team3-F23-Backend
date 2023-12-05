@@ -2,14 +2,10 @@ import spacy
 import pandas as pd
 import numpy as np
 import re
-import json
-from sklearn.base import BaseEstimator
-from sklearn.pipeline import Pipeline
 from sklearn.dummy import DummyClassifier
 import pickle
 from keras.preprocessing.sequence import pad_sequences
 from keras.saving import load_model
-
 from keras.models import Sequential
 from keras.layers import Conv1D, MaxPool1D, GlobalMaxPooling1D, Dense, LSTM, Embedding, SpatialDropout1D
 from keras.preprocessing.text import Tokenizer
@@ -20,23 +16,26 @@ from gensim.models import KeyedVectors
 
 class MLService:
     def get_keywords(self, df):
-        # define pipeline
-        pipeline_preprocessing = Pipeline([
-            ('pre_process_text', PreProcessText('jobDescription')),
-            ('GetNounPhrases', GetNounPhrases('jobDescription'))
-        ])
+        # Pre-process data
+        df['jobDescription'] = df['jobDescription'].str.replace(
+            r'\x96', ' ', regex=True)
+        lines_extracted = pre_process_text(df['jobDescription'][0])
 
-        # list with noun phrases
-        list_noun_phrases = pipeline_preprocessing.transform(df)
+        # Extract noun phrases
+        list_noun_phrases = extract_noun_phrases(lines_extracted)
+        lowercased_noun_phrases = [string.lower()
+                                   for string in list_noun_phrases]
+        print('\nORIG noun phrases:{}'.format(list_noun_phrases))
+        print('\nLOWERCASE noun phrases:{}'.format(lowercased_noun_phrases))
 
-        # to be used
-        with open("/app/Capabilities/tokenizer.pickle", "rb") as file:
-            tokenizer = pickle.load(file)
+        # # to be used
+        # with open("/app/Capabilities/tokenizer.pickle", "rb") as file:
+        #     tokenizer = pickle.load(file)
 
-        # to be used
-        test_t = tokenizer.texts_to_sequences(np.asarray(list_noun_phrases))
-        test_t_padding = pad_sequences(test_t, 50)
-        print(test_t_padding)
+        # # to be used
+        # test_t = tokenizer.texts_to_sequences(np.asarray(list_noun_phrases))
+        # test_t_padding = pad_sequences(test_t, 50)
+        # print(test_t_padding)
 
         # load keras model
         # model_cnn = load_model("/app/Capabilities/CNN_model.keras")
@@ -46,65 +45,44 @@ class MLService:
             model = pickle.load(file)
 
         # get prediction from model
-        prediction = model.predict(list_noun_phrases)
+        prediction = model.predict(lowercased_noun_phrases)
         print("The result is", prediction)
         return list_noun_phrases[prediction == 1].tolist()
 
 
-class PreProcessText(BaseEstimator):
-    def __init__(self, col):
-        self.col = col
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X, y=None):
-        X[self.col] = X[self.col].str.replace(r'\.?\n+', '. ', regex=True)
-        X[self.col] = X[self.col].str.replace(r'\x95', '', regex=True)
-        X[self.col] = X[self.col].str.replace(r'^-\s?', '', regex=True)
-        X[self.col] = X[self.col].str.replace(
-            r'^\s?\d\)?\s?\.\s?', '', regex=True)
-        X[self.col] = X[self.col].str.replace(r'[\.\.\.]', ' ', regex=True)
-        X[self.col] = X[self.col].str.replace(r'"', ' ', regex=True)
-        X[self.col] = X[self.col].str.replace(r':', ' ', regex=True)
-        X[self.col] = X[self.col].str.replace(r'\*', '', regex=True)
-        X[self.col] = X[self.col].str.replace(r'\(', ' ', regex=True)
-        X[self.col] = X[self.col].str.replace(r'\)', ' ', regex=True)
-        X[self.col] = X[self.col].str.replace(r'\s+', ' ', regex=True)
-        return X
+def pre_process_text(text):
+    pattern = r"(?m)^[\s]*([\u2022\xb7]|\d+\)|\-|\d+\.)\s*(.*)$"
+    # Finding all matches in the text
+    print('\nTEXT : {}'.format(text))
+    matches = re.findall(pattern, text)
+    print('\nMATCHES: {}'.format(matches))
+    return matches
 
 
-class GetNounPhrases(BaseEstimator):
-    def __init__(self, col):
-        self.col = col
+def extract_noun_phrases(list_text):
+    clean_list_np = []
+    nlp = spacy.load('en_core_web_sm')
+    if (len(list_text) > 0):
+        for line in list_text:
+            print('\nLINE: {}'.format(line[-1]))
+            text = line[-1]
+            # print(text)
+            doc = nlp(text)
+            for chunk in doc.noun_chunks:
+                clean_np = []
+                for token in chunk:
+                    if (token.pos_ != 'PRON' and token.pos_ != 'DET' and token.text != '(' and token.text != '"' and token.text != '*'):
+                        clean_np.append(str(token))
+                t1 = " ".join(clean_np)
 
-    def fit(self, X, y=None):
-        return self
+                if (chunk.root.text not in ['that', '-', '#']):
+                    if ((chunk.root.dep_ == 'dobj') and (chunk.root.pos_ != 'PROPN')):
+                        # new_chunk = chunk.root.head.lemma_ + " " + chunk.text
+                        new_chunk = chunk.root.head.lemma_ + " " + t1
+                        clean_list_np.append(new_chunk.strip())
+                    else:
+                        if (len(t1) > 0):
+                            clean_list_np.append(t1.strip())
 
-    def transform(self, X, y=None):
-        nlp = spacy.load('en_core_web_sm')
-        doc = nlp(X[self.col][0])
-        all_noun_phrases = []
-        for chunk in doc.noun_chunks:
-            elements = []
-            for token in chunk:
-                if (token.pos_ != 'PRON' and token.pos_ != 'DET'):
-                    elements.append(str(token))
-            # list of elements to string
-            if (len(elements) > 0):
-                single_noun_phrase = ' '.join(elements)
-                split_np = []
-                if (',' in single_noun_phrase):
-                    split_np = re.split(r'[,]', single_noun_phrase)
-                    for i in range(len(split_np) - 1):
-                        split_np[i] = re.sub(r'^\s+', '', split_np[i])
-                        split_np[i] = re.sub(r'\s+$', '', split_np[i])
-                        split_np[i] += " " + chunk.root.text
-                    split_np[-1] = re.sub(r'^\s*[and]*\s*', '', split_np[-1])
-                    for i in split_np:
-                        all_noun_phrases.append(i.lower())
-                else:
-                    # add noun phrase string to total list
-                    all_noun_phrases.append(single_noun_phrase.lower())
-        all_noun_phrases = np.unique(all_noun_phrases)
-        return np.asanyarray(all_noun_phrases)
+    all_noun_phrases = np.unique(clean_list_np)
+    return np.asanyarray(all_noun_phrases)

@@ -67,9 +67,7 @@ class MLService:
         lstm_w2v = Sequential()
         lstm_w2v.add(embedding_layer_w2v)
         lstm_w2v.add(SpatialDropout1D(0.2))  # Using an ideal value for RNN's
-        lstm_w2v.add(LSTM(256, dropout=0.2, recurrent_dropout=0.2))
-        lstm_w2v.add(Dense(128, activation='relu'))
-        lstm_w2v.add(Dense(64, activation='relu'))
+        lstm_w2v.add(LSTM(64, dropout=0.3, recurrent_dropout=0.3))
         lstm_w2v.add(Dense(32, activation='relu'))
         lstm_w2v.add(Dense(1, activation='sigmoid'))
         lstm_w2v.load_weights("/app/Capabilities/lstm_weights.h5")

@@ -22,7 +22,7 @@ import pickle
 
 
 
-root = 'C:/Users\stell\Documents\Académico\Centennial College\Fall 2023\COMP 313 - Software Project/NN'
+root = '.'  # folder that contains Data.csv
 file = 'Data.csv'
 path = os.path.join(root,file)
 
@@ -59,7 +59,7 @@ Parameters for the Embedding Layers, path and other embedding stuff
 max_num_words = 10000
 max_sequence = 50
 emb_dim = 300
-word2vec_path = 'C:/Users\stell\Documents\Académico\Centennial College\Fall 2023\COMP 262 - NLP/GoogleNews-vectors-negative300.bin'
+word2vec_path = 'GoogleNews-vectors-negative300.bin'
 
 
 

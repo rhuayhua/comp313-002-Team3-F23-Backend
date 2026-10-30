@@ -25,7 +25,7 @@ public class JobPage extends BasePage {
 
     List<String[]> list= new ArrayList<>();
 
-    CSVWriter writer = new CSVWriter(new FileWriter("C://Users//rhuay//Documents//CENTENNIAL//FALL_23//Software_Project2//OUTPUT//output.csv"));
+    CSVWriter writer = new CSVWriter(new FileWriter("output.csv"));
 
     public JobPage() throws IOException {
         PageFactory.initElements(getDriver(), this);
